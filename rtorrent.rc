@@ -1,0 +1,165 @@
+#############################################################################
+# A minimal rTorrent configuration that provides the basic features
+#############################################################################
+
+# Some default configs are commented out by #, you can override them to fit your needs
+# Lines commented out by ## are merely examples (NOT default)
+
+# It is recommended to extend upon this default config file. For example:
+# override only some configs via command line: -o network.listen.port.range.set = 42969-42969
+# or, on top of custom config: import = /etc/rtorrent/rtorrent.rc
+
+# rTorrent runtime directory (cfg.basedir) [default: "$HOME/.local/share/rtorrent"]
+method.insert = cfg.basedir,  private|const|string, (cat,(system.env,HOME),"/.local/share/rtorrent/")
+
+# Default download directory (cfg.download) [default: "$(cfg.basedir)/download"]
+method.insert = cfg.download, private|const|string, (cat,(cfg.basedir),"download/")
+
+# Log directory (cfg.logs) [default: "$(cfg.basedir)/log"]
+method.insert = cfg.logs,     private|const|string, (cat,(cfg.basedir),"log/")
+method.insert = cfg.logfile,  private|const|string, (cat,(cfg.logs),"rtorrent-",(system.time),".log")
+
+# Torrent session directory (cfg.session) [default: "$(cfg.basedir)/.session"]
+method.insert = cfg.session,  private|const|string, (cat,(cfg.basedir),".session/")
+
+# Watch (drop to add) directories (cfg.watch) [default: "$(cfg.basedir)/watch"]
+method.insert = cfg.watch,    private|const|string, (cat,(cfg.basedir),"watch/")
+
+# Répertoires créés par cleanup-rtorrent.sh avant le lancement de rtorrent :
+# le namespace fs.* (fs.mkdir, fs.mkdir.recursive, fs.homedir) n'existe plus
+# côté rakshasa (retiré, pas renommé) — mkdir -p côté shell à la place.
+
+# Drop to "$(cfg.watch)/load" to add torrent
+schedule = watch_load, 11, 10, ((load.verbose, (cat, (cfg.watch), "load/*.torrent")))
+
+# Drop to "$(cfg.watch)/start" to add torrent and start downloading
+schedule = watch_start, 10, 10, ((load.start_verbose, (cat, (cfg.watch), "start/*.torrent")))
+
+# Listening port for incoming peer traffic
+network.listen.port.range.set = 38641-38641
+network.listen.port.random.set = no
+
+# Distributed Hash Table and Peer EXchange
+# Enable tracker-less torrents but vulnerable to passive sniffing
+# DHT and PEX are always disabled for private torrents
+dht.mode.set = auto
+dht.port.set = 49160
+protocol.pex.set = yes
+
+# DHT nodes for bootstrapping
+dht.add_node = dht.transmissionbt.com:6881
+dht.add_node = dht.libtorrent.org:25401
+dht.add_node = router.bittorrent.com:6881
+dht.add_node = router.utorrent.com:6881
+dht.add_node = dht.aelitis.com:6881
+
+# UDP tracker support
+#trackers.use_udp.set = yes
+
+# Peer settings
+throttle.max_uploads.set = 200
+throttle.max_uploads.global.set = 500
+throttle.min_peers.normal.set = 20
+throttle.max_peers.normal.set = 200
+throttle.min_peers.seed.set = 30
+throttle.max_peers.seed.set = 300
+trackers.numwant.set = 200
+
+#protocol.encryption.set = allow_incoming,try_outgoing,enable_retry
+
+# Limits for file handle resources. Container ulimit nofile = 65536
+# (set in docker-compose), so we give rTorrent generous headroom.
+# 730+ torrents seeding saturated the previous 2000 cap -> rtorrent
+# died, flood killed the daemon, container exit 1 (incident 2026-06-23).
+# You MUST leave a ceiling of handles below the OS ulimit.
+network.max_open_files.set = 8000
+network.max_open_sockets.set = 2000
+
+# Memory resource usage (increase if you have a large number of items loaded,
+# and/or the available resources to spend)
+pieces.memory.max.set = 1800M
+#network.xmlrpc.size_limit.set = 16M
+
+# Preallocate disk space for contents of a torrent
+#
+# Useful for reducing fragmentation, improving the performance
+# and I/O patterns of future read operations. However, with this
+# enabled, preallocated files will occupy the full size even if
+# they are not completed.
+#
+# If you choose to allocate space for the whole torrent at once,
+# rTorrent will create all files and allocate the space when the
+# torrent is started. rTorrent will NOT delete the file and free
+# the allocated space, if you later mark a file as DO NOT DOWNLOAD.
+#
+#   0 = disabled
+#   1 = enabled, allocate when a file is opened for write
+#   2 = enabled, allocate the space for the whole torrent at once
+#
+# If you choose 2, as new torrents are guaranteed the space required,
+# average CPU usage can be further reduced by disabling periodic low
+# disk space check: "schedule_remove2 = low_diskspace"
+#system.file.allocate.set = 0
+
+# Basic operational settings
+session.path.set = (cat, (cfg.session))
+directory.default.set = (cat, (cfg.download))
+log.execute = (cat, (cfg.logs), "execute.log")
+##log.xmlrpc = (cat, (cfg.logs), "xmlrpc.log")
+
+# Other operational settings
+# encoding.add n'existe plus côté rakshasa (retiré, pas de remplaçant trouvé
+# dans le code source — l'UTF-8 semble géré nativement désormais)
+system.umask.set = 0027
+system.cwd.set = (directory.default)
+#schedule = low_diskspace, 5, 60, ((close_low_diskspace, 500M))
+#pieces.hash.on_completion.set = no
+##view.sort_current = seeding, greater=d.ratio=
+##keys.layout.set = qwerty
+
+# HTTP and SSL
+network.http.max_total_connections.set = 50
+network.http.dns_cache_timeout.set = 25
+
+# Path to the CA bundle. By default, rTorrent tries to detect from:
+#   $RTORRENT_CA_BUNDLE (highest priority)
+#   $CURL_CA_BUNDLE
+#   $SSL_CERT_FILE
+#   /etc/ssl/certs/ca-certificates.crt
+#   /etc/pki/tls/certs/ca-bundle.crt
+#   /usr/share/ssl/certs/ca-bundle.crt
+#   /usr/local/share/certs/ca-root-nss.crt
+#   /etc/ssl/cert.pem (lowest priority)
+##network.http.cacert.set = /etc/ssl/certs/ca-certificates.crt
+
+# Path to the certificate directory to verify the peer. The certificates
+# must be in PEM format, and the directory must have been processed using
+# the c_rehash utility supplied with openssl.
+#
+# For advanced users only, generally you should use network.http.cacert.set
+# to specify path to the bundle of certificates.
+##network.http.capath.set = "/etc/ssl/certs"
+
+#network.http.ssl_verify_peer.set = 1
+#network.http.ssl_verify_host.set = 1
+
+# Run the rTorrent process as a daemon in the background
+#system.daemon.set = false
+
+# XML-RPC interface
+network.scgi.open_port = 127.0.0.1:5000
+
+# Logging:
+#   Levels = critical error warn notice info debug
+#   Groups = connection_* dht_* peer_* rpc_* storage_* thread_* tracker_* torrent_*
+print = (cat, "Logging to ", (cfg.logfile))
+log.open_file = "log", (cfg.logfile)
+log.add_output = "info", "log"
+##log.add_output = "tracker_debug", "log"
+
+session.use_lock.set = no
+
+# Forcer IPv4 uniquement
+network.bind_address.set = 0.0.0.0
+
+### END of rtorrent.rc ###
