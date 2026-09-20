@@ -1,0 +1,57 @@
+name: build-and-push
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      rtorrent_version:
+        description: 'Tag rakshasa/rtorrent + libtorrent (ex: v0.16.23)'
+        required: true
+        default: 'v0.16.23'
+      flood_version:
+        description: 'Version jesec/flood (ex: 4.16.2)'
+        required: true
+        default: '4.16.2'
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: vars
+        run: |
+          echo "rtorrent_version=${{ github.event.inputs.rtorrent_version || 'v0.16.23' }}" >> "$GITHUB_OUTPUT"
+          echo "flood_version=${{ github.event.inputs.flood_version || '4.16.2' }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Docker Hub : décommenter une fois le compte créé + secrets ajoutés
+      # dans Settings > Secrets and variables > Actions de ce repo
+      # (DOCKERHUB_USERNAME, DOCKERHUB_TOKEN)
+      # - uses: docker/login-action@v3
+      #   with:
+      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
+      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            RTORRENT_VERSION=${{ steps.vars.outputs.rtorrent_version }}
+            FLOOD_VERSION=${{ steps.vars.outputs.flood_version }}
+          tags: |
+            ghcr.io/axolotty/rtorrent-flood-image:${{ steps.vars.outputs.rtorrent_version }}-${{ steps.vars.outputs.flood_version }}
+            ghcr.io/axolotty/rtorrent-flood-image:latest
+          # Docker Hub : ajouter les tags <compte>/rtorrent-flood:... ici une fois prêt
