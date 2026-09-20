@@ -1,3 +1,5 @@
+version: 52
+
 jobs:
 - name: build et push image docker
   steps:
