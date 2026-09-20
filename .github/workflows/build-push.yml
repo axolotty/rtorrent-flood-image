@@ -36,13 +36,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Docker Hub : décommenter une fois le compte créé + secrets ajoutés
-      # dans Settings > Secrets and variables > Actions de ce repo
-      # (DOCKERHUB_USERNAME, DOCKERHUB_TOKEN)
-      # - uses: docker/login-action@v3
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - uses: docker/build-push-action@v6
         with:
@@ -54,4 +51,5 @@ jobs:
           tags: |
             ghcr.io/axolotty/rtorrent-flood-image:${{ steps.vars.outputs.rtorrent_version }}-${{ steps.vars.outputs.flood_version }}
             ghcr.io/axolotty/rtorrent-flood-image:latest
-          # Docker Hub : ajouter les tags <compte>/rtorrent-flood:... ici une fois prêt
+            docker.io/axolotty/rtorrent-flood:${{ steps.vars.outputs.rtorrent_version }}-${{ steps.vars.outputs.flood_version }}
+            docker.io/axolotty/rtorrent-flood:latest

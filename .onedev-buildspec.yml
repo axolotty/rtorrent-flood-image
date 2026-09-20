@@ -13,15 +13,14 @@ jobs:
   - !BuildImageStep
     name: build + push image
     output: !RegistryOutput
-      tags: "@server@/rtorrent-flood-image/rtorrent-flood:@tag@ @server@/rtorrent-flood-image/rtorrent-flood:latest"
-      # Docker Hub une fois le compte créé : ajouter à la même chaîne
-      # docker.io/<compte>/rtorrent-flood:@tag@ docker.io/<compte>/rtorrent-flood:latest
+      tags: "@server@/rtorrent-flood-image/rtorrent-flood:@tag@ @server@/rtorrent-flood-image/rtorrent-flood:latest docker.io/axolotty/rtorrent-flood:@tag@ docker.io/axolotty/rtorrent-flood:latest"
     registryLogins:
     - registryUrl: "@server_url@"
       userName: "@job_token@"
       passwordSecret: onedev-registry-token
-    # Docker Hub une fois prêt : ajouter un 2e login (registryUrl vide,
-    # userName = compte Docker Hub, passwordSecret = un 2e job secret)
+    - registryUrl: ""
+      userName: axolotty
+      passwordSecret: dockerhub-token
     platforms: linux/amd64
     condition: SUCCESSFUL
 
