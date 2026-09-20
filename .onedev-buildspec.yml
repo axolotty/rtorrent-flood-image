@@ -1,0 +1,29 @@
+jobs:
+- name: build et push image docker
+  steps:
+  - !CheckoutStep
+    name: récupération du dépôt
+    cloneCredential: !DefaultCredential {}
+    withLfs: false
+    withSubmodules: false
+    condition: SUCCESSFUL
+
+  - !BuildImageStep
+    name: build + push image
+    output: !RegistryOutput
+      tags: "@server@/rtorrent-flood-image/rtorrent-flood:@tag@ @server@/rtorrent-flood-image/rtorrent-flood:latest"
+      # Docker Hub une fois le compte créé : ajouter à la même chaîne
+      # docker.io/<compte>/rtorrent-flood:@tag@ docker.io/<compte>/rtorrent-flood:latest
+    registryLogins:
+    - registryUrl: "@server_url@"
+      userName: "@job_token@"
+      passwordSecret: onedev-registry-token
+    # Docker Hub une fois prêt : ajouter un 2e login (registryUrl vide,
+    # userName = compte Docker Hub, passwordSecret = un 2e job secret)
+    platforms: linux/amd64
+    condition: SUCCESSFUL
+
+  triggers:
+  - !TagCreateTrigger
+    tags: "v*"
+  retryCondition: never
