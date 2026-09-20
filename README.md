@@ -67,6 +67,25 @@ Tout le reste (`session.path.set`, `directory.default.set`, `dht.mode.set`, `dht
 arguments fixes (`-o system.daemon.set=true`) qui n'incluent pas `-D`. D'où la nécessité de
 corriger chaque directive plutôt que de compter dessus.
 
+### Nouveau comportement (pas un renommage) : annonces tracker en double pile IPv4+IPv6
+
+Contrairement à jesec (qui n'a aucune logique de sélection de famille d'adresse dans son code
+tracker HTTP), rakshasa tente par défaut **IPv4 puis IPv6 en repli** pour chaque annonce tracker
+(`TrackerHttp::request_families()`, `src/tracker/tracker_http.cc`), sauf si l'un des deux est
+explicitement bloqué. Dans un environnement où IPv6 est coupé au niveau noyau (ex. conteneur VPN
+avec `sysctl net.ipv6.conf.all.disable_ipv6=1`, cas de ce déploiement derrière gluetun), ce repli
+échoue systématiquement avec `Bind address for requested IP protocol(s) not available.` — visible
+dans le statut tracker de Flood sous la forme `v6 : ...`. **Inoffensif en soi** (l'annonce IPv4
+reste tentée en priorité), mais bruyant et trompeur si on ne sait pas que c'est nouveau. Pour le
+supprimer si IPv6 n'est de toute façon pas disponible :
+
+```
+network.block.ipv6.set = yes
+```
+
+(commande absente de jesec — nouvelle avec la refonte réseau 2025 de rakshasa, cf aussi
+`network.block.ipv4`/`network.block.ipv4in6`/`network.prefer.ipv6`).
+
 ## Patches
 
 **Aucun.** Contrairement à l'ancien chantier de patch sur le fork jesec (2 correctifs manuels :

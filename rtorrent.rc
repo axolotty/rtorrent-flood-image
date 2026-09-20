@@ -162,4 +162,9 @@ session.use_lock.set = no
 # Forcer IPv4 uniquement
 network.bind_address.set = 0.0.0.0
 
+# rakshasa tente les annonces tracker en double pile IPv4+IPv6 par défaut
+# (nouveau vs jesec, cf README) : bloquer l'IPv6 si non disponible sur l'hôte
+# pour éviter le repli systématique voué à échouer.
+network.block.ipv6.set = yes
+
 ### END of rtorrent.rc ###
