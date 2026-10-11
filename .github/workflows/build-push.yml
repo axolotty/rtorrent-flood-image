@@ -3,16 +3,16 @@ name: build-and-push
 on:
   push:
     tags: ['v*']
+  schedule:
+    - cron: '17 6 * * 1'   # lundi matin : suit les releases rakshasa/rtorrent et jesec/flood
   workflow_dispatch:
     inputs:
       rtorrent_version:
-        description: 'Tag rakshasa/rtorrent + libtorrent (ex: v0.16.23)'
-        required: true
-        default: 'v0.16.23'
+        description: 'Tag rakshasa/rtorrent + libtorrent (ex: v0.16.23) ; vide = dernière release'
+        required: false
       flood_version:
-        description: 'Version jesec/flood (ex: 4.16.2)'
-        required: true
-        default: '4.16.2'
+        description: 'Version jesec/flood (ex: 4.16.2) ; vide = dernière release'
+        required: false
 
 jobs:
   build-push:
@@ -23,25 +23,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Versions : depuis le tag git (vX.Y.Z-A.B.C), sinon les entrées manuelles,
+      # sinon la dernière release de chaque projet. En planifié, on ne rebuild
+      # pas un couple déjà publié sur GHCR.
       - id: vars
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IN_RT: ${{ github.event.inputs.rtorrent_version }}
+          IN_FL: ${{ github.event.inputs.flood_version }}
         run: |
-          echo "rtorrent_version=${{ github.event.inputs.rtorrent_version || 'v0.16.23' }}" >> "$GITHUB_OUTPUT"
-          echo "flood_version=${{ github.event.inputs.flood_version || '4.16.2' }}" >> "$GITHUB_OUTPUT"
+          case "$GITHUB_REF" in
+            refs/tags/v*) tag=${GITHUB_REF#refs/tags/}; rt=$(cut -d- -f1 <<<"$tag"); fl=$(cut -d- -f2 <<<"$tag") ;;
+            *) rt=${IN_RT:-$(gh api repos/rakshasa/rtorrent/releases/latest --jq .tag_name)}
+               fl=${IN_FL:-$(gh api repos/jesec/flood/releases/latest --jq .tag_name)}; fl=${fl#v} ;;
+          esac
+          echo "rtorrent_version=$rt" >> "$GITHUB_OUTPUT"
+          echo "flood_version=$fl" >> "$GITHUB_OUTPUT"
+          echo "tag=$rt-$fl" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && docker manifest inspect "ghcr.io/axolotty/rtorrent-flood-image:$rt-$fl" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"; echo "$rt-$fl déjà publiée, rien à faire"
+          else
+            echo "build de $rt-$fl"
+          fi
 
-      - uses: docker/setup-buildx-action@v3
+      - if: steps.vars.outputs.skip != 'true'
+        uses: docker/setup-buildx-action@v3
 
-      - uses: docker/login-action@v3
+      - if: steps.vars.outputs.skip != 'true'
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: docker/login-action@v3
+      - if: steps.vars.outputs.skip != 'true'
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - uses: docker/build-push-action@v6
+      - if: steps.vars.outputs.skip != 'true'
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
@@ -49,7 +71,7 @@ jobs:
             RTORRENT_VERSION=${{ steps.vars.outputs.rtorrent_version }}
             FLOOD_VERSION=${{ steps.vars.outputs.flood_version }}
           tags: |
-            ghcr.io/axolotty/rtorrent-flood-image:${{ steps.vars.outputs.rtorrent_version }}-${{ steps.vars.outputs.flood_version }}
+            ghcr.io/axolotty/rtorrent-flood-image:${{ steps.vars.outputs.tag }}
             ghcr.io/axolotty/rtorrent-flood-image:latest
-            docker.io/axolotty/rtorrent-flood:${{ steps.vars.outputs.rtorrent_version }}-${{ steps.vars.outputs.flood_version }}
+            docker.io/axolotty/rtorrent-flood:${{ steps.vars.outputs.tag }}
             docker.io/axolotty/rtorrent-flood:latest
