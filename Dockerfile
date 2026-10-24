@@ -53,6 +53,11 @@ FROM jesec/flood:${FLOOD_VERSION}
 USER root
 RUN apk --no-cache add libcurl ncurses-libs xmlrpc-c xmlrpc-c++ libunistring
 
+# Node : jesec/flood traîne parfois derrière les releases de sécurité de node
+# (ex. CVE-2026-111497 Brotli, corrigée en 24.22.1) ; on écrase son binaire par
+# celui de node:24-alpine (même base musl). Inoffensif quand jesec est à jour.
+COPY --from=node:24-alpine /usr/local/bin/node /usr/local/bin/node
+
 COPY --from=builder /build/rtorrent-rakshasa /usr/bin/rtorrent
 RUN chmod 0755 /usr/bin/rtorrent \
     && ldd /usr/bin/rtorrent | grep -i "not found" && exit 1 || true \
