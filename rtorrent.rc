@@ -154,7 +154,8 @@ network.scgi.open_port = 127.0.0.1:5000
 #   Groups = connection_* dht_* peer_* rpc_* storage_* thread_* tracker_* torrent_*
 print = (cat, "Logging to ", (cfg.logfile))
 log.open_file = "log", (cfg.logfile)
-log.add_output = "info", "log"
+log.add_output = "errors", "log"
+log.add_output = "events", "log"
 ##log.add_output = "tracker_debug", "log"
 
 session.use_lock.set = no
